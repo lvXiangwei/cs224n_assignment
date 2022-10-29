@@ -18,7 +18,7 @@ def sigmoid(x):
     """
 
     ### YOUR CODE HERE (~1 Line)
-
+    s = 1/(1+np.exp(-x))
     ### END YOUR CODE
 
     return s
@@ -64,9 +64,14 @@ def naiveSoftmaxLossAndGradient(
     ### Please use the provided softmax function (imported earlier in this file)
     ### This numerically stable implementation helps you avoid issues pertaining
     ### to integer overflow. 
-
+    y_hat = np.matmul(outsideVectors, centerWordVec) # Uv_c
+    y_hat = softmax(y_hat) # y_hat
+    y = np.zeros(y_hat.shape)
+    y[outsideWordIdx] = 1
+    loss = -np.log(y_hat)[outsideWordIdx]
+    gradCenterVec = np.dot(outsideVectors.T, y_hat - y)
+    gradOutsideVecs = np.outer(y_hat - y, centerWordVec)
     ### END YOUR CODE
-
     return loss, gradCenterVec, gradOutsideVecs
 
 
@@ -109,7 +114,17 @@ def negSamplingLossAndGradient(
     indices = [outsideWordIdx] + negSampleWordIndices
 
     ### YOUR CODE HERE (~10 Lines)
+    U = outsideVectors[indices]
+    U[1:] = -U[1:]
+    l = sigmoid(np.dot(U, centerWordVec))
+    loss = -np.log(l).sum()
 
+    gradCenterVec = ((l - 1).reshape(-1, 1) * U).sum(axis=0)
+
+    gradOutsideVecs = np.zeros(outsideVectors.shape)
+    gradOutsideVecs[outsideWordIdx] = (l[0] - 1) * centerWordVec
+    for i, idx in enumerate(negSampleWordIndices):
+        gradOutsideVecs[idx] += (1 - l[1 + i]) * centerWordVec
     ### Please use your implementation of sigmoid in here.
 
     ### END YOUR CODE
@@ -157,9 +172,15 @@ def skipgram(currentCenterWord, windowSize, outsideWords, word2Ind,
     gradOutsideVectors = np.zeros(outsideVectors.shape)
 
     ### YOUR CODE HERE (~8 Lines)
-
+    c_idx = word2Ind[currentCenterWord]
+    centerWordVec = centerWordVectors[c_idx]
+    for o_words in outsideWords[:2*windowSize]:
+        o_idx = word2Ind[o_words] 
+        loss_, gradCenterVecs_, gradOutsideVectors_ = word2vecLossAndGradient(centerWordVec, o_idx, outsideVectors, dataset)
+        loss += loss_
+        gradCenterVecs[c_idx] += gradCenterVecs_
+        gradOutsideVectors += gradOutsideVectors_
     ### END YOUR CODE
-    
     return loss, gradCenterVecs, gradOutsideVectors
 
 
@@ -281,6 +302,7 @@ if __name__ == "__main__":
                         help='Name of the function you would like to test.')
 
     args = parser.parse_args()
+    # print(args.function)
     if args.function == 'sigmoid':
         test_sigmoid()
     elif args.function == 'naiveSoftmaxLossAndGradient':
